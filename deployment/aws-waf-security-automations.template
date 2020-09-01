@@ -34,6 +34,8 @@ Metadata:
           - ActivateScannersProbesProtectionParam
           - ActivateReputationListsProtectionParam
           - ActivateBadBotProtectionParam
+          - ActivateAllowFileUploadsProtectionParam
+          - ActivateAllowPatientListProtectionParam
 
       - Label:
           default: Settings
@@ -70,6 +72,12 @@ Metadata:
 
       ActivateBadBotProtectionParam:
         default: Activate Bad Bot Protection
+
+      ActivateAllowFileUploadsProtectionParam:
+        default: Activate File Uploads Allow Rule
+
+      ActivateAllowPatientListProtectionParam:
+        default: Activate Patient List Allow Rule
 
       EndpointType:
         default: Endpoint Type
@@ -126,7 +134,7 @@ Parameters:
 
   ActivateScannersProbesProtectionParam:
     Type: String
-    Default: 'yes - AWS Lambda log parser'
+    Default: 'yes - Amazon Athena log parser'
     AllowedValues:
       - 'yes - AWS Lambda log parser'
       - 'yes - Amazon Athena log parser'
@@ -150,6 +158,22 @@ Parameters:
       - 'yes'
       - 'no'
     Description: Choose yes to enable the component designed to block bad bots and content scrapers.
+
+  ActivateAllowFileUploadsProtectionParam:
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Description: Choose yes to enable the component designed to allow file upload requests.
+
+  ActivateAllowPatientListProtectionParam:
+    Type: String
+    Default: 'yes'
+    AllowedValues:
+      - 'yes'
+      - 'no'
+    Description: Choose yes to enable the component designed to allow patient list requests.
 
   EndpointType:
     Type: String
@@ -348,6 +372,8 @@ Resources:
         ActivateScannersProbesProtectionParam: !Ref ActivateScannersProbesProtectionParam
         ActivateReputationListsProtectionParam: !Ref ActivateReputationListsProtectionParam
         ActivateBadBotProtectionParam: !Ref ActivateBadBotProtectionParam
+        ActivateAllowFileUploadsProtectionParam: !Ref ActivateAllowFileUploadsProtectionParam
+        ActivateAllowPatientListProtectionParam: !Ref ActivateAllowPatientListProtectionParam
         RequestThreshold: !Ref RequestThreshold
         RegionScope: !If [AlbEndpoint, 'REGIONAL', 'CLOUDFRONT']
         ParentStackName: !Ref 'AWS::StackName'
@@ -1635,6 +1661,8 @@ Resources:
       ActivateScannersProbesProtectionParam: !Ref ActivateScannersProbesProtectionParam
       ActivateReputationListsProtectionParam: !Ref ActivateReputationListsProtectionParam
       ActivateBadBotProtectionParam: !Ref ActivateBadBotProtectionParam
+      ActivateAllowFileUploadsProtectionParam: !Ref ActivateAllowFileUploadsProtectionParam
+      ActivateAllowPatientListProtectionParam: !Ref ActivateAllowPatientListProtectionParam      
       ActivateAWSManagedRulesParam: !Ref ActivateAWSManagedRulesParam
       KeepDataInOriginalS3Location: !Ref KeepDataInOriginalS3Location
       # AWS WAF Web ACL

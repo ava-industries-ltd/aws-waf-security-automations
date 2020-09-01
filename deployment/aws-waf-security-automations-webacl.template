@@ -35,6 +35,10 @@ Parameters:
     Type: String
   ActivateBadBotProtectionParam:
     Type: String
+  ActivateAllowFileUploadsProtectionParam:
+    Type: String
+  ActivateAllowPatientListProtectionParam:
+    Type: String
   RequestThreshold:
     Type: Number
   RegionScope:
@@ -99,6 +103,14 @@ Conditions:
     - !Ref ActivateBadBotProtectionParam
     - 'yes'
 
+  AllowFileUploadsProtectionActivated: !Equals
+    - !Ref ActivateAllowFileUploadsProtectionParam
+    - 'yes'
+
+  AllowPatientListProtectionActivated: !Equals
+    - !Ref ActivateAllowPatientListProtectionParam
+    - 'yes'
+
 Mappings:
   SourceCode:
     General:
@@ -111,9 +123,14 @@ Resources:
 # There is a rate throttling issue when creating so many calls to create IPSet (1 TPS)
 # By daisychaining these timers at N second intervals we can pace the calls to create new IPSets
 # binding them with DependsOn to the right timer
+  TimerFileUpload:
+    Type: 'Custom::Timer'
+    Properties:
+      ServiceToken: !GetAtt CustomTimer.Arn
 
   TimerWhiteV4:
     Type: 'Custom::Timer'
+    DependsOn: TimerFileUpload
     Properties:
       ServiceToken: !GetAtt CustomTimer.Arn
 
@@ -182,6 +199,17 @@ Resources:
     DependsOn: TimerReputationV6
     Properties:
       ServiceToken: !GetAtt CustomTimer.Arn
+
+# RegexPatternSets
+  FileUploadRegexPatternSet:
+    Type: AWS::WAFv2::RegexPatternSet
+    DependsOn: TimerFileUpload
+    Properties:
+      Name: FileUploadRegexPatternSet
+      Scope: !Sub '${RegionScope}'
+      Description: RegexPatternSet for File Upload
+      RegularExpressionList:
+        - multipart\/form\-data*
 
 # IPV4 IPSets
   WAFWhitelistSetV4:
@@ -418,9 +446,59 @@ Resources:
                 - IPSetReferenceStatement:
                     Arn: !GetAtt WAFBlacklistSetV6.Arn
         - !If
+          - AllowFileUploadsProtectionActivated
+          - Name: !Sub '${ParentStackName}AllowFileUploadsRule'
+            Priority: 3
+            Action:
+              Allow: {}
+            VisibilityConfig:
+              SampledRequestsEnabled: true
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'AllowFileUploadsRule']]
+            Statement:
+              RegexPatternSetReferenceStatement:
+                FieldToMatch:
+                  SingleHeader:
+                    Name: content-type
+                Arn: !GetAtt FileUploadRegexPatternSet.Arn
+                TextTransformations:
+                - Type: NONE
+                  Priority: 0
+          - !Ref 'AWS::NoValue'
+        - !If
+          - AllowPatientListProtectionActivated
+          - Name: !Sub '${ParentStackName}AllowPatientListRule'
+            Priority: 4
+            Action:
+              Allow: {}
+            VisibilityConfig:
+              SampledRequestsEnabled: true
+              CloudWatchMetricsEnabled: true
+              MetricName: !Join ['', [!Join ['', !Split ['-', !Ref ParentStackName]], 'AllowPatientListRule']]
+            Statement:
+              OrStatement:
+                Statements:
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      UriPath: {}
+                    PositionalConstraint: CONTAINS
+                    SearchString: attachments
+                    TextTransformations:
+                    - Type: LOWERCASE
+                      Priority: 0
+                - ByteMatchStatement:
+                    FieldToMatch:
+                      UriPath: {}
+                    PositionalConstraint: CONTAINS
+                    SearchString: patient_lists/automated
+                    TextTransformations:
+                    - Type: LOWERCASE
+                      Priority: 0
+          - !Ref 'AWS::NoValue'
+        - !If
           - HttpFloodProtectionLogParserActivated
           - Name: !Sub '${ParentStackName}HttpFloodRegularRule'
-            Priority: 3
+            Priority: 7
             Action:
               Block: {}
             VisibilityConfig:
@@ -438,7 +516,7 @@ Resources:
         - !If
           - HttpFloodProtectionRateBasedRuleActivated
           - Name: !Sub '${ParentStackName}HttpFloodRateBasedRule'
-            Priority: 4
+            Priority: 8
             Action:
               Block: {}
             VisibilityConfig:
@@ -453,7 +531,7 @@ Resources:
         - !If
           - ScannersProbesProtectionActivated
           - Name: !Sub '${ParentStackName}ScannersAndProbesRule'
-            Priority: 5
+            Priority: 9
             Action:
               Block: {}
             VisibilityConfig:
@@ -471,7 +549,7 @@ Resources:
         - !If
           - ReputationListsProtectionActivated
           - Name: !Sub '${ParentStackName}IPReputationListsRule'
-            Priority: 6
+            Priority: 10
             Action:
               Block: {}
             VisibilityConfig:
@@ -489,7 +567,7 @@ Resources:
         - !If
           - BadBotProtectionActivated
           - Name: !Sub '${ParentStackName}BadBotRule'
-            Priority: 7
+            Priority: 11
             Action:
               Block: {}
             VisibilityConfig:
@@ -604,7 +682,6 @@ Resources:
                         - Priority: 2
                           Type: HTML_ENTITY_DECODE
           - !Ref 'AWS::NoValue'
-
 Outputs:
 # Arns
   WAFWhitelistSetV4Arn:
